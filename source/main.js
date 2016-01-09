@@ -17,31 +17,83 @@ const switchIconUnread = ()=> {
 const switchIconRead = ()=> {
   mb.tray.setImage(__dirname + '/images/read.png')
 }
+const setTrayTitle = (title)=> {
+  mb.tray.setTitle(title)
+}
 
 class ReWebSocket extends EventEmitter {
   constructor(url) {
     super()
     this.url = url
     this.websocket()
+    this.reserveReconnect()
+    this.intervalId = null
   }
+
   send(...args) {
-    this.websocket().send(...args)
+    try{
+      this.websocket().send(...args)
+    } catch(e) {
+      console.log('error')
+      return;
+    }
   }
+
   websocket() {
     if(!this.ws) {
-      this.ws = new WebSocket(this.url);
+      try{
+        this.ws = new WebSocket(this.url);
+      }
+      catch(e) {
+        console.log('error')
+        return;
+      }
       this.ws.on('message', (msg)=> {
+        this.cancelReconnect()
+        this.reserveReconnect()
+
         this.emit('message', msg)
       })
-      this.ws.on('close', (...args)=> {
-        this.emit('close', ...args)
-        setTimeout(()=>{this.websocket()}, 1000);
-      });
       this.ws.on('open', (...args)=> {
+        console.log('open')
+        this.cancelReconnect()
+
         this.emit('open', ...args)
       })
+      this.ws.on('close', (...args)=> {
+        console.log('close')
+        this.reserveReconnect();
+
+        this.emit('close', ...args)
+      });
+      this.ws.on('error', (...args)=> {
+        console.log('error')
+        this.emit('error', ...args)
+      });
     }
     return this.ws
+  }
+
+  closeConnection(){
+    this.ws.close(1000)
+    this.ws = null
+  }
+  cancelReconnect() {
+    if(!this.intervalId) return
+    console.log('cancel reconnect')
+    clearTimeout(this.intervalId)
+    this.intervalId = null
+  }
+
+  reserveReconnect() {
+    this.cancelReconnect()
+    if(this.intervalId) return
+    console.log('reserv reconnect')
+    this.intervalId = setTimeout(()=>{
+      console.log('reconnect')
+      this.closeConnection()
+      this.websocket();
+    }, 1000 * 10);
   }
 }
 
@@ -55,6 +107,9 @@ mb.on('ready', function ready () {
         "pair": "BTCUSD"
     }))
   })
+  ipcMain.on('set_title', function(event, arg) {
+    setTrayTitle(arg.toString())
+  });
   ipcMain.on('fetch_request', function(event, arg) {
     w.on('message', (msg)=> {
       event.sender.send('fetch_response', msg);
