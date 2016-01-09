@@ -11,14 +11,13 @@ const FETCH_INTERVAL = 10000
 class MessageList extends React.Component {
   render() {
     let list = this.props.list.map((msg)=> {
-      let created_at = moment(msg.created_at).format('MM/DD HH:mm:ss');
+      let created_at = moment(new Date(msg[2] * 1000)).format('MM/DD HH:mm:ss');
       return (
         <li className='msg_list-item' key={msg[1]}>
           <div className='msg_list-item_title'>
-            <div className='msg_list-item-user'><i className="flaticon-user43"></i> {''}</div>
-            <div className='msg_list-item-time'>{msg[2]}</div>
+            <div className='msg_list-item-user'> {msg[3]} : {msg[4]} </div>
+            <div className='msg_list-item-time'>{created_at}</div>
           </div>
-          <div className='msg_list-item_content'>{msg[3]} : {msg[4]}</div>
         </li>
       );
     });
@@ -54,16 +53,16 @@ class App extends React.Component {
 
     let recentlyId = 0
     ipcRenderer.on('fetch_response', (event, arg)=> {
-      let data = JSON.parse(arg.data);
+      let data = JSON.parse(arg);
       if(data.length != 5) {
         return;
       }
-      console.log(data)
       let list = this.state.body.slice()
       list.unshift(data)
       if(list.length > 50) {
         list.length = 50
       }
+      ipcRenderer.send('set_title', data[3])
       this.setState({body: list})
       this.notify(data[3], data[4]);
       ipcRenderer.send('mark_unread');
